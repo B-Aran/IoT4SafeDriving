@@ -1,0 +1,12 @@
+{
+	"gps":{
+		"latitude": 40.329796,
+		"longitude": -3.787745,
+		"height": 650
+	},
+	"imu":{
+		"yaw":32,
+		"pitch":34,
+		"roll":343
+	}
+}

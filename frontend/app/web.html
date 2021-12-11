@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="eng">
+    <head>
+        <script src="INSERT YOUR GOOGLE MAPS API KEY HERE"></script>
+        <!--<script type="text/javascript" src="./func.js"></script> -->
+        <script type="text/javascript" src="./optiondiv.js"></script>
+        <link rel="stylesheet" href="style.css">
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+        <title id="title">Iot4SafeDriving Visor</title>
+        <base href="http://low_cost_sensors.com">
+    </head>
+    <body>
+        <h1>Iot4SafeDriving Visor</h1>
+        <div class="get">
+            <div class="filters">
+                <div class="row">
+                    <div class="col">
+                        <h2>Since ...</h2>
+                        <input id="ini" type="datetime-local" ></input>
+                    </div>
+                    <div class="col">
+                        <h2>To ...</h2>
+                        <input id="fin" type="datetime-local" ></input>
+                    </div>
+                </div>
+            <div class="but">
+                <button class="getdata" onclick="get_interval()"> Get Data </button>
+            </div>
+            <div class="slide">
+                <label class="switch">
+                    <input type="checkbox" onclick="change_export_value()">
+                    <span class="slider round"></span>
+                </label>
+                <h3>Export to CSV</h3>
+            </div>
+        </div>
+        <div class="variable_filter">
+            <button class="var_button" onclick="yaw_button()"> Yaw </button>
+            <button class="var_button" onclick="pitch_button()"> Pitch </button>
+            <button class="var_button" onclick="roll_button()"> Roll </button>
+        </div>
+        <div class="variable_filter"><span id="actvar"><h3>Pitch</h3></span></div>
+        <div id="map"></div>
+        <script type="text/javascript">
+
+            //Centro del mapa a cambiar
+            const lat_lega = 40.330;
+            const lng_lega = -3.765;
+
+            //Variables del mapa
+            let map;
+            var polylines = [];
+            var vehicle_lines = [[],[],[],[],[]];
+            var markers = [];
+            var export_value = false;
+            var last_call = "";
+            var filter_array = [false , false , false , false , false];
+            var color_options = [["#0022FF"],["#22FF00"],["#FFF700"],["#FF00EE"],["#FF8C00"]];
+            //                     Yaw - pitch- roll
+            var variable_filter = [false , true , false]
+
+            //Change the values to compare here
+            var yaw_filter = [1,2]
+            var pitch_filter = [1,2]
+            var roll_filter = [1,2]
+
+            const get_url = "http://127.0.0.1:5000/charge";
+
+            function initMap() {
+                //set up the map
+                var mapDiv = document.getElementById("map");
+                var myOptions = {
+                  zoom: 17,
+                  center: new google.maps.LatLng(lat_lega, lng_lega),
+                  mapTypeControl: true,
+        		  mapTypeControlOptions: {
+        	      	style: google.maps.MapTypeControlStyle.DROPDOWN_MENU
+        	       }
+                }
+                map = new google.maps.Map(mapDiv, myOptions);
+
+                //Create DropDownMenu for selecting vehicles
+                //create the options that respond to click
+                var divOptions = {
+                		gmap: map,
+                		name: 'All Data',
+                		title: "This acts like a button or click event",
+                		id: "mapOpt",
+                		action: function(){
+                            filter_array = [];
+                			last_call_filter();
+                		}
+                }
+                var optionDiv1 = new optionDiv(divOptions);
+
+                var divOptions = {
+                		gmap: map,
+                		name: 'All vehicles',
+                		title: "This acts like a button or click event",
+                		id: "mapOpt",
+                		action: function(){
+                            filter_array = [true,true,true,true,true];
+                			last_call_filter();
+                		}
+                }
+                var optionDiv2 = new optionDiv(divOptions);
+
+                //create the check box items
+                var checkOptions = {
+                		gmap: map,
+                		title: "This allows for multiple selection/toggling on/off",
+                		id: "terrainCheck",
+                		label: "Vehicle 1",
+                		action: function(){
+                            change_filter_value(0);
+                			last_call_filter();
+                		}
+                }
+                var check1 = new checkBox(checkOptions);
+
+                var checkOptions2 = {
+                		gmap: map,
+                		title: "This allows for multiple selection/toggling on/off",
+                		id: "myCheck",
+                		label: "Vehicle 2",
+                		action: function(){
+                            change_filter_value(1);
+                			last_call_filter();
+                		}
+                }
+                var check2 = new checkBox(checkOptions2);
+
+                var checkOptions3 = {
+                		gmap: map,
+                		title: "This allows for multiple selection/toggling on/off",
+                		id: "myCheck",
+                		label: "Vehicle 3",
+                		action: function(){
+                			change_filter_value(2);
+                			last_call_filter();
+                		}
+                }
+                var check3 = new checkBox(checkOptions3);
+
+                var checkOptions4 = {
+                		gmap: map,
+                		title: "This allows for multiple selection/toggling on/off",
+                		id: "myCheck",
+                		label: "Vehicle 4",
+                		action: function(){
+                            change_filter_value(3);
+                			last_call_filter();
+                		}
+                }
+                var check4 = new checkBox(checkOptions4);
+
+                var checkOptions5 = {
+                		gmap: map,
+                		title: "This allows for multiple selection/toggling on/off",
+                		id: "myCheck",
+                		label: "Vehicle 5",
+                		action: function(){
+                            change_filter_value(4);
+                			last_call_filter();
+                		}
+                }
+                var check5 = new checkBox(checkOptions5);
+
+                //create the input box items
+
+                //possibly add a separator between controls
+                var sep = new separator();
+
+                //put them all together to create the drop down
+                var ddDivOptions = {
+                	items: [optionDiv1, optionDiv2, sep, check1, check2, check3, check4, check5],
+                	id: "myddOptsDiv"
+                }
+                //alert(ddDivOptions.items[1]);
+                var dropDownDiv = new dropDownOptionsDiv(ddDivOptions);
+
+                var dropDownOptions = {
+                		gmap: map,
+                		name: 'Select Vehicules',
+                		id: 'ddControl',
+                		title: 'A custom drop down select with mixed elements',
+                        style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+                		position: google.maps.ControlPosition.TOP_CENTER,
+                		dropDown: dropDownDiv
+                }
+
+                var dropDown1 = new dropDownControl(dropDownOptions);
+                paint_data();
+            }
+            function change_export_value(){
+                if(export_value){
+                    export_value = false;
+                }
+                else export_value = true;
+            }
+
+            function change_filter_value(i){
+                if(filter_array[i]){
+                    filter_array[i] = false;
+                }
+                else filter_array[i] = true;
+            }
+            function getFormattedTime(time){
+                let unix_timestamp = time;
+                // Create a new JavaScript Date object based on the timestamp
+                // multiplied by 1000 so that the argument is in milliseconds, not seconds.
+                var date = new Date(unix_timestamp * 1000);
+                // Hours part from the timestamp
+                var hours = date.getHours();
+                // Minutes part from the timestamp
+                var minutes = "0" + date.getMinutes();
+                // Seconds part from the timestamp
+                var seconds = "0" + date.getSeconds();
+
+                // Will display time in 10:30:23 format
+                var formattedTime = hours + ' H ' + minutes.substr(-2) + ' M ' + seconds.substr(-2) + ' S';
+
+                return formattedTime
+            }
+
+            async function get_points(){
+                fetch(get_url).then(function(response){
+                    return response.json();
+                }).then(function(data){
+                    return data;
+                })
+            }
+
+            async function paint_data(){
+                //Borramos markers y polylines antiguas
+                for (let i in markers){
+                    markers[i].setMap(null);
+                }
+                markers = [];
+                for(let i in polylines){
+                    polylines[i].setMap(null);
+                }
+                polylines = [];
+                vehicle_lines = [[],[],[],[],[]];
+
+                //Get data
+                var response = await fetch(get_url);
+                var data = await response.json();
+                var line = [];
+                for (let i in data){
+                    aux = {lat: parseFloat(data[i]["geometry"]["coordinates"][1]) , lng: parseFloat(data[i]["geometry"]["coordinates"][0])};
+                    //Prepare for global polyline
+                    line.push(aux)
+                    //Make a polyline for vehicule
+                    switch (data[i]["properties"]["vehiculo"]) {
+                        case 1:
+                            vehicle_lines[0].push(data[i]);
+                            break;
+                        case 2:
+                            vehicle_lines[1].push(data[i]);
+                            break;
+                        case 3:
+                            vehicle_lines[2].push(data[i]);
+                            break;
+                        case 4:
+                            vehicle_lines[3].push(data[i]);
+                            break;
+                        case 5:
+                            vehicle_lines[4].push(data[i]);
+                            break;
+                    }
+
+                    //Filter by variable and by value of variable change the color of the marker
+                    color = "";
+                    if(variable_filter[0]){
+                        text = "Lat: " + data[i]["geometry"]["coordinates"][1]+ " Lon: "+ data[i]["geometry"]["coordinates"][0] + " Yaw: "+data[i]["properties"]["yaw"];
+                        if(data[i]["properties"]["yaw"]<yaw_filter[0]) color = "#00CED1";
+                        else if (data[i]["properties"]["yaw"]<yaw_filter[1]) color = "#FF8C00";
+                        else color = "#B22222";
+                    }
+                    else if(variable_filter[1]){
+                        text = "Lat: " + data[i]["geometry"]["coordinates"][1]+ " Lon: "+ data[i]["geometry"]["coordinates"][0] + " Pitch: "+data[i]["properties"]["pitch"];
+                        if(data[i]["properties"]["pitch"]<pitch_filter[0]) color = "#00CED1";
+                        else if (data[i]["properties"]["pitch"]<pitch_filter[1]) color = "#FF8C00";
+                        else color = "#B22222";
+                    }
+                    else{
+                        text = "Lat: " + data[i]["geometry"]["coordinates"][1]+ " Lon: "+ data[i]["geometry"]["coordinates"][0] + " Roll: "+data[i]["properties"]["roll"];
+                        if(data[i]["properties"]["roll"]<roll_filter[0]) color = "#00CED1";
+                        else if (data[i]["properties"]["roll"]<roll_filter[1]) color = "#FF8C00";
+                        else color = "#B22222";
+                    }
+                    //Add new marker
+                    const infoWindow = new google.maps.InfoWindow({content: text,});
+                    const popup = new google.maps.InfoWindow({content: text,});
+                    const marker = new google.maps.Marker({position: aux, map, title: "Point "+i,icon:{path:google.maps.SymbolPath.CIRCLE, scale:3,strokeColor:color},});
+                    marker.addListener("click", () => {infoWindow.open({anchor: marker,map,shouldFocus: false,});});
+                    markers.push(marker);
+                    last_call = get_url;
+                }
+                //Paint polyline
+                const polyline = new google.maps.Polyline({
+                    path: line,
+                    geodesic: true,
+                    strokeColor: "#FF0000",
+                    strokeOpacity: 1.0,
+                    strokeWeight: 2,
+                  });
+                 polyline.setMap(map);
+                 polylines.push(polyline)
+            }
+
+            async function get_interval(){
+                //Cogemos valores en un intervalo de tiempo
+                var fecha_ini = document.getElementById("ini").value;
+                var fecha_fin = document.getElementById("fin").value;
+                const ini = +new Date(fecha_ini)
+                const fin = +new Date(fecha_fin)
+                //Call the API
+                var interval_url = "http://127.0.0.1:5000/get_interval?fecha_ini="+ini+"&fecha_fin="+fin;
+
+                const response = await fetch(interval_url)
+                const data = await response.json()
+                //If we want to export to csv
+                if(export_value){
+                    //JSON to CSV
+                    var json = data;
+                    json = DataToJson(json);
+                    var fields = Object.keys(json[0])
+                    var replacer = function(key, value) { return value === null ? '' : value }
+                    var csv = json.map(function(row){
+                      return fields.map(function(fieldName){
+                        return JSON.stringify(row[fieldName], replacer)
+                      }).join(',')
+                    })
+                    csv.unshift(fields.join(',')) // add header column
+                     csv = csv.join('\r\n');
+                    //Select the filename and download the file
+                    var filename = "Data_"+ini+"_"+fin+".csv";
+                    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    if (navigator.msSaveBlob) { // IE 10+
+                        navigator.msSaveBlob(blob, filename);
+                    } else {
+                        var link = document.createElement("a");
+                        if (link.download !== undefined) { // feature detection
+                            // Browsers that support HTML5 download attribute
+                            var url = URL.createObjectURL(blob);
+                            link.setAttribute("href", url);
+                            link.setAttribute("download", filename);
+                            link.style.visibility = 'hidden';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        }
+                    }
+                }
+                //Borramos markers y polylines antiguas
+                for (let i in markers){
+                    markers[i].setMap(null);
+                }
+                markers = [];
+                for(let i in polylines){
+                    polylines[i].setMap(null);
+                }
+                polylines = [];
+                vehicle_lines = [[],[],[],[],[]];
+
+                //Pintamos nueva polyline y markers y añadimos a arrays globales.
+                line = [];
+
+                for (let i in data){
+                    aux = {lat: parseFloat(data[i]["geometry"]["coordinates"][1]) , lng: parseFloat(data[i]["geometry"]["coordinates"][0])};
+                    //Prepare for polyline
+                    line.push(aux)
+                    //Prepare vehicle lines
+                    switch (data[i]["properties"]["vehiculo"]) {
+                        case 1:
+                            vehicle_lines[0].push(data[i]);
+                            break;
+                        case 2:
+                            vehicle_lines[1].push(data[i]);
+                            break;
+                        case 3:
+                            vehicle_lines[2].push(data[i]);
+                            break;
+                        case 4:
+                            vehicle_lines[3].push(data[i]);
+                            break;
+                        case 5:
+                            vehicle_lines[4].push(data[i]);
+                            break;
+                    }
+                    //Filter by variable and by value of variable change the color of the marker
+                    color = "";
+                    if(variable_filter[0]){
+                        text = "Lat: " + data[i]["geometry"]["coordinates"][1]+ " Lon: "+ data[i]["geometry"]["coordinates"][0] + " Yaw: "+data[i]["properties"]["yaw"];
+                        if(data[i]["properties"]["yaw"]<yaw_filter[0]) color = "#00CED1";
+                        else if (data[i]["properties"]["yaw"]<yaw_filter[1]) color = "#FF8C00";
+                        else color = "#B22222";
+                    }
+                    else if(variable_filter[1]){
+                        text = "Lat: " + data[i]["geometry"]["coordinates"][1]+ " Lon: "+ data[i]["geometry"]["coordinates"][0] + " Pitch: "+data[i]["properties"]["pitch"];
+                        if(data[i]["properties"]["pitch"]<pitch_filter[0]) color = "#00CED1";
+                        else if (data[i]["properties"]["pitch"]<pitch_filter[1]) color = "#FF8C00";
+                        else color = "#B22222";
+                    }
+                    else{
+                        text = "Lat: " + data[i]["geometry"]["coordinates"][1]+ " Lon: "+ data[i]["geometry"]["coordinates"][0] + " Roll: "+data[i]["properties"]["roll"];
+                        if(data[i]["properties"]["roll"]<roll_filter[0]) color = "#00CED1";
+                        else if (data[i]["properties"]["roll"]<roll_filter[1]) color = "#FF8C00";
+                        else color = "#B22222";
+                    }
+                    //Add new marker
+
+                    const infoWindow = new google.maps.InfoWindow({content: text,});
+                    const popup = new google.maps.InfoWindow({content: text,});
+                    const marker = new google.maps.Marker({position: aux, map, title: "Point "+i,icon:{path:google.maps.SymbolPath.CIRCLE, scale:3,strokeColor:color,},});
+                    marker.addListener("click", () => {infoWindow.open({anchor: marker,map,shouldFocus: false,});});
+                    markers.push(marker);
+                }
+
+                //Paint polyline
+                const polyline = new google.maps.Polyline({
+                    path: line,
+                    geodesic: true,
+                    strokeColor: "#FF0000",
+                    strokeOpacity: 1.0,
+                    strokeWeight: 2,
+                  });
+                 polyline.setMap(map);
+                 polylines.push(polyline);
+                 last_call = interval_url;
+            }
+            function yaw_button(){
+
+                document.getElementById("actvar").innerHTML = "<h3>Yaw</h3>";
+                variable_filter = [true, false, false];
+                last_call_filter();
+            }
+            function pitch_button(){
+                document.getElementById("actvar").innerHTML = "<h3>Pitch</h3>";
+                variable_filter = [false, true, false];
+                last_call_filter();
+            }
+            function roll_button(){
+                document.getElementById("actvar").innerHTML = "<h3>Roll</h3>";
+                variable_filter = [false, false, true];
+                last_call_filter();
+            }
+            function last_call_filter(){
+                var filtering = false;
+                for (let i in filter_array){
+                    if(filter_array[i]){
+                        filtering = true;
+                    }
+                }
+                if (!filtering) {
+                    if(last_call.localeCompare(get_url)==0){
+                        paint_data();
+                    }
+                    else get_interval(1);
+                }
+                else{
+                    //Borramos markers y polylines antiguas
+                    for (let i in markers){
+                        markers[i].setMap(null);
+                    }
+                    markers = [];
+                    for(let i in polylines){
+                        polylines[i].setMap(null);
+                    }
+                    polylines = [];
+
+                    //Pintamos aquellos vehiculos que queremos
+                    for (let i in filter_array){
+                        console.log(vehicle_lines);
+                        if(filter_array[i]){
+                            console.log(i);
+                            //Pintamos nueva polyline por vehiculo y markers y añadimos a arrays globales.
+                            line = [];
+                            for (let j in vehicle_lines[i]){
+
+                                aux = {lat: parseFloat(vehicle_lines[i][j]["geometry"]["coordinates"][1]) , lng: parseFloat(vehicle_lines[i][j]["geometry"]["coordinates"][0])};
+                                //Prepare for polyline
+                                line.push(aux)
+
+                                color = "";
+                                if(variable_filter[0]){
+                                    text = "Lat: " + vehicle_lines[i][j]["geometry"]["coordinates"][1]+ " Lon: "+ vehicle_lines[i][j]["geometry"]["coordinates"][0] + " Yaw: "+ vehicle_lines[i][j]["properties"]["yaw"];
+                                    if(vehicle_lines[i][j]["properties"]["yaw"]<yaw_filter[0]) color = "#00CED1";
+                                    else if (vehicle_lines[i][j]["properties"]["yaw"]<yaw_filter[1]) color = "#FF8C00";
+                                    else color = "#B22222";
+                                }
+                                else if(variable_filter[1]){
+                                    text = "Lat: " + vehicle_lines[i][j]["geometry"]["coordinates"][1]+ " Lon: "+ vehicle_lines[i][j]["geometry"]["coordinates"][0] + " Pitch: "+vehicle_lines[i][j]["properties"]["pitch"];
+                                    if(vehicle_lines[i][j]["properties"]["pitch"]<pitch_filter[0]) color = "#00CED1";
+                                    else if (vehicle_lines[i][j]["properties"]["pitch"]<pitch_filter[1]) color = "#FF8C00";
+                                    else color = "#B22222";
+                                }
+                                else{
+                                    text = "Lat: " + vehicle_lines[i][j]["geometry"]["coordinates"][1]+ " Lon: "+ vehicle_lines[i][j]["geometry"]["coordinates"][0] + " Roll: "+vehicle_lines[i][j]["properties"]["roll"];
+                                    if(vehicle_lines[i][j]["properties"]["roll"]<roll_filter[0]) color = "#00CED1";
+                                    else if (vehicle_lines[i][j]["properties"]["roll"]<roll_filter[1]) color = "#FF8C00";
+                                    else color = "#B22222";
+                                }
+                                //Add new marker
+
+                                const infoWindow = new google.maps.InfoWindow({content: text,});
+                                const popup = new google.maps.InfoWindow({content: text,});
+                                const marker = new google.maps.Marker({position: aux, map, title: "Point "+i,icon:{path:google.maps.SymbolPath.CIRCLE, scale:3,strokeColor:color},});
+                                marker.addListener("click", () => {infoWindow.open({anchor: marker,map,shouldFocus: false,});});
+                                markers.push(marker);
+                            }
+
+                            //Paint polyline
+                            const polyline = new google.maps.Polyline({
+                                path: line,
+                                geodesic: true,
+                                strokeColor: color_options[i],
+                                strokeOpacity: 1.0,
+                                strokeWeight: 2,
+                              });
+                             polyline.setMap(map);
+                             polylines.push(polyline);
+                        }
+                    }
+
+                }
+            }
+
+            function DataToJson(data){
+                result = [];
+                for (let i in data){
+                    aux = {
+                        "longitude": data[i]["geometry"]["coordinates"][0],
+                        "latitude": data[i]["geometry"]["coordinates"][1],
+                        "altitude": data[i]["properties"]["altitude"],
+                        "yaw": data[i]["properties"]["yaw"],
+                        "pitch": data[i]["properties"]["pitch"],
+                        "roll": data[i]["properties"]["roll"],
+                        "vehicle": data[i]["properties"]["vehiculo"],
+                        "timestamp":data[i]["properties"]["timestamp"],
+                    }
+                    result.push(aux)
+                }
+                return result;
+            }
+
+            initMap();
+        </script>
+    </body>
+</html>
